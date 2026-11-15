@@ -7,6 +7,7 @@ using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.Configure<HostOptions>(options => options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost);
 builder.Services.AddSingleton(sp => { var s = sp.GetRequiredService<IConfiguration>().GetSection("Mongo"); return new MongoClient(s["ConnectionString"] ?? "mongodb://localhost:27017").GetDatabase(s["Database"] ?? "oficina_execution"); });
 builder.Services.AddSingleton<EventPublisher>();
 builder.Services.AddHostedService<PaymentConsumer>();
