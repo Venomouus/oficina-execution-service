@@ -101,20 +101,40 @@ public sealed class ExecutionOutboxWorker(IMongoDatabase db, EventPublisher even
 
 public sealed class PaymentConsumer(IConfiguration configuration, IMongoDatabase db, ILogger<PaymentConsumer> logger) : BackgroundService
 {
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var s = configuration.GetSection("RabbitMq"); var factory = new ConnectionFactory { HostName = s["Host"] ?? "localhost", Port = s.GetValue("Port", 5672), UserName = s["User"] ?? "oficina", Password = s["Password"] ?? "oficina" }; var connection = factory.CreateConnection(); var channel = connection.CreateModel(); channel.ExchangeDeclare("oficina.events", ExchangeType.Topic, durable: true); var queue = channel.QueueDeclare("execution-service-events", true, false, false).QueueName; channel.QueueBind(queue, "oficina.events", "OS_READY_FOR_EXECUTION"); channel.BasicQos(0, 1, false);
-        var consumer = new EventingBasicConsumer(channel);
-        consumer.Received += async (_, args) =>
+        var collection = db.GetCollection<ExecutionOrder>("execution");
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                using var doc = JsonDocument.Parse(args.Body.ToArray()); var orderId = doc.RootElement.GetProperty("payload").GetProperty("orderId").GetGuid(); var collection = db.GetCollection<ExecutionOrder>("execution"); var existing = await collection.Find(x => x.OrderId == orderId).FirstOrDefaultAsync(); if (existing is null) await collection.InsertOneAsync(new ExecutionOrder { OrderId = orderId }); channel.BasicAck(args.DeliveryTag, false);
+                await collection.Indexes.CreateOneAsync(new CreateIndexModel<ExecutionOrder>(
+                    Builders<ExecutionOrder>.IndexKeys.Ascending(x => x.OrderId),
+                    new CreateIndexOptions { Unique = true, Name = "unique_order_id" }), cancellationToken: stoppingToken);
+                break;
             }
-            catch (JsonException ex) { logger.LogError(ex, "Evento de execucao malformado; descartando"); channel.BasicReject(args.DeliveryTag, false); }
-            catch (Exception ex) { logger.LogError(ex, "Falha ao inserir OS na execucao"); channel.BasicNack(args.DeliveryTag, false, true); }
-        };
-        channel.BasicConsume(queue, false, consumer); return Task.CompletedTask;
+            catch (MongoCommandException ex) when (ex.Code == 11000)
+            {
+                logger.LogCritical(ex, "Ja existem OS duplicadas no banco; corrija os dados antes de iniciar o consumidor");
+                throw;
+            }
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+            {
+                logger.LogError(ex, "Banco indisponivel ao preparar indice de idempotencia; nova tentativa em 2 segundos");
+                await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+            }
+        }
+        if (stoppingToken.IsCancellationRequested) return;
+        await ReliableRabbitConsumer.RunAsync(configuration, "execution-service-events", ["OS_READY_FOR_EXECUTION"], async body =>
+        {
+            using var doc = JsonDocument.Parse(body); var orderId = doc.RootElement.GetProperty("payload").GetProperty("orderId").GetGuid();
+            if (await collection.Find(x => x.OrderId == orderId).AnyAsync(stoppingToken)) return;
+            try { await collection.InsertOneAsync(new ExecutionOrder { OrderId = orderId }, cancellationToken: stoppingToken); }
+            catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
+            {
+                // Outra entrega da mesma OS venceu a corrida.
+            }
+        }, logger, stoppingToken);
     }
 }
 

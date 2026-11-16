@@ -167,6 +167,10 @@ public sealed class IntegrationTests(IntegrationEnvironment env)
     public async Task Consumer_InsertsOnceForDuplicateDelivery_AndDiscardsMalformedEvent()
     {
         using var channel = env.OpenChannel();
+        // O publicador da OS declara exchange, fila e binding antes de emitir.
+        channel.ExchangeDeclare("oficina.events", ExchangeType.Topic, durable: true);
+        channel.QueueDeclare("execution-service-events", durable: true, exclusive: false, autoDelete: false);
+        channel.QueueBind("execution-service-events", "oficina.events", "OS_READY_FOR_EXECUTION");
         var id = Guid.NewGuid();
         var sentinel = Guid.NewGuid();
         channel.BasicPublish("oficina.events", "OS_READY_FOR_EXECUTION", null, Encoding.UTF8.GetBytes("{broken"));
@@ -177,6 +181,8 @@ public sealed class IntegrationTests(IntegrationEnvironment env)
         await IntegrationEnvironment.UntilAsync(async () => await env.Orders.CountDocumentsAsync(x => x.OrderId == sentinel) == 1);
         Assert.Equal(1, await env.Orders.CountDocumentsAsync(x => x.OrderId == id));
         Assert.Equal(ExecutionStatuses.Queued, (await env.Orders.Find(x => x.OrderId == id).SingleAsync()).Status);
+        await Assert.ThrowsAsync<MongoWriteException>(() => env.Orders.InsertOneAsync(
+            new ExecutionOrder { OrderId = id }));
     }
 
     [Fact]

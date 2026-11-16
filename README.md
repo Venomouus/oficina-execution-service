@@ -26,6 +26,12 @@ Uma falha pode ser registrada em qualquer etapa nao terminal. Transicoes
 invalidas retornam HTTP 409; repetir o mesmo status nao republica o evento.
 O evento de finalizacao/falha e gravado no documento da execucao junto com a
 mudanca de status e reenviado por um worker se o RabbitMQ estiver indisponivel.
+O consumidor reconecta ao RabbitMQ e um indice unico em `OrderId` evita criar
+duas execucoes para a mesma OS. Falhas temporarias aguardam 30 segundos em
+`execution-service-events.retry`; mensagens malformadas ou que excedam 5
+novas tentativas vao para `execution-service-events.dead` e exigem investigacao e
+reenvio manual. Se o MongoDB ja contiver OS duplicadas, corrija os registros
+antes de iniciar o consumidor; o servico nao apaga dados automaticamente.
 
 ## Executar
 
@@ -52,3 +58,6 @@ assembly de producao completa `ExecutionService` e falha abaixo de 80% das
 linhas. O CI executa o mesmo teste e verificador.
 O relatorio Cobertura fica disponivel no artefato `execution-service-coverage`
 da execucao do workflow de CI.
+O [painel SonarCloud do PR](https://sonarcloud.io/dashboard?id=Venomouus_oficina-execution-service&pullRequest=1)
+mostra o quality gate e a cobertura de codigo novo; o verificador local/CI
+exige separadamente pelo menos 80% de linhas da assembly de producao.
