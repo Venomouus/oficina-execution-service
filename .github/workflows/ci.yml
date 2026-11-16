@@ -33,7 +33,7 @@ jobs:
         run: dotnet restore Tests/ExecutionService.Tests/ExecutionService.Tests.csproj
 
       - name: Begin SonarCloud analysis
-        run: '"$RUNNER_TEMP/sonar/dotnet-sonarscanner" begin /k:"Venomouus_oficina-execution-service" /o:"venomouus" /d:sonar.token="$SONAR_TOKEN"'
+        run: '"$RUNNER_TEMP/sonar/dotnet-sonarscanner" begin /k:"Venomouus_oficina-execution-service" /o:"venomouus" /d:sonar.token="$SONAR_TOKEN" /d:sonar.cs.opencover.reportsPaths="Tests/ExecutionService.Tests/TestResults/**/coverage.opencover.xml"'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
@@ -41,7 +41,7 @@ jobs:
         run: dotnet build Tests/ExecutionService.Tests/ExecutionService.Tests.csproj --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test Tests/ExecutionService.Tests/ExecutionService.Tests.csproj --no-build --no-restore --configuration Release --collect:"XPlat Code Coverage" --results-directory Tests/ExecutionService.Tests/TestResults/ci
+        run: dotnet test Tests/ExecutionService.Tests/ExecutionService.Tests.csproj --no-build --no-restore --configuration Release --collect:"XPlat Code Coverage" --results-directory Tests/ExecutionService.Tests/TestResults/ci -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura,opencover
 
       - name: Enforce production line coverage
         run: pwsh -File Tests/verify-coverage.ps1 -ResultsDirectory Tests/ExecutionService.Tests/TestResults/ci

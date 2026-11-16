@@ -5,6 +5,7 @@ using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using Oficina.Execution;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<HostOptions>(options => options.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.StopHost);
@@ -36,6 +37,8 @@ app.MapPatch("/api/execution/{orderId:guid}/status", async (Guid orderId, Update
 });
 app.Run();
 
+namespace Oficina.Execution
+{
 public record UpdateExecutionRequest(string Status, string? Reason);
 public static class ExecutionStatuses { public const string Queued = "NA_FILA"; public const string Diagnosing = "EM_DIAGNOSTICO"; public const string Repairing = "EM_REPARO"; public const string Finished = "FINALIZADA"; public const string Failed = "EXECUCAO_COM_ERRO"; public static readonly HashSet<string> All = new(StringComparer.OrdinalIgnoreCase) { Queued, Diagnosing, Repairing, Finished, Failed }; }
 public static class ExecutionSaga
@@ -113,6 +116,8 @@ public sealed class PaymentConsumer(IConfiguration configuration, IMongoDatabase
         };
         channel.BasicConsume(queue, false, consumer); return Task.CompletedTask;
     }
+}
+
 }
 
 public partial class Program { }

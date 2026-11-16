@@ -16,5 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../ExecutionService.csproj" />
+    <Using Include="Oficina.Execution" />
   </ItemGroup>
 </Project>
