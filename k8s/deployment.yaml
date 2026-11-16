@@ -15,15 +15,24 @@ spec:
     spec:
       containers:
         - name: execution-service
-          image: oficina-execution-service:local
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/venomouus/oficina-execution-service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           env:
             - name: ASPNETCORE_URLS
               value: http://+:8080
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: observability-config
+                  key: otlp-endpoint
+                  optional: true
             - name: Mongo__ConnectionString
-              value: mongodb://billing-db:27017
+              valueFrom:
+                secretKeyRef:
+                  name: execution-service-secrets
+                  key: database-connection
             - name: Mongo__Database
               value: oficina_execution
             - name: RabbitMq__Host
@@ -52,6 +61,12 @@ spec:
               port: 8080
             initialDelaySeconds: 30
             periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
 ---
 apiVersion: v1
 kind: Service
