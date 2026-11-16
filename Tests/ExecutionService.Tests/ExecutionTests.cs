@@ -21,4 +21,16 @@ public class ExecutionTests
         Assert.NotEmpty(order.Id);
         Assert.NotEqual(default, order.CreatedAt);
     }
+
+    [Fact]
+    public void Execution_Only_Advances_And_Final_States_Do_Not_Reopen()
+    {
+        Assert.True(ExecutionSaga.CanTransition(ExecutionStatuses.Queued, ExecutionStatuses.Diagnosing));
+        Assert.True(ExecutionSaga.CanTransition(ExecutionStatuses.Diagnosing, ExecutionStatuses.Repairing));
+        Assert.True(ExecutionSaga.CanTransition(ExecutionStatuses.Repairing, ExecutionStatuses.Finished));
+        Assert.True(ExecutionSaga.CanTransition(ExecutionStatuses.Diagnosing, ExecutionStatuses.Failed));
+        Assert.False(ExecutionSaga.CanTransition(ExecutionStatuses.Queued, ExecutionStatuses.Finished));
+        Assert.False(ExecutionSaga.CanTransition(ExecutionStatuses.Finished, ExecutionStatuses.Repairing));
+        Assert.False(ExecutionSaga.CanTransition(ExecutionStatuses.Failed, ExecutionStatuses.Finished));
+    }
 }

@@ -41,7 +41,17 @@ jobs:
         run: dotnet build Tests/ExecutionService.Tests/ExecutionService.Tests.csproj --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test Tests/ExecutionService.Tests/ExecutionService.Tests.csproj --no-build --no-restore --configuration Release --collect:"XPlat Code Coverage"
+        run: dotnet test Tests/ExecutionService.Tests/ExecutionService.Tests.csproj --no-build --no-restore --configuration Release --collect:"XPlat Code Coverage" --results-directory Tests/ExecutionService.Tests/TestResults/ci
+
+      - name: Enforce production line coverage
+        run: pwsh -File Tests/verify-coverage.ps1 -ResultsDirectory Tests/ExecutionService.Tests/TestResults/ci
+
+      - name: Upload coverage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: execution-service-coverage
+          path: Tests/ExecutionService.Tests/TestResults/ci/**/coverage.cobertura.xml
 
       - name: End SonarCloud analysis
         if: always()
