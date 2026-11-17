@@ -65,12 +65,11 @@ exige separadamente pelo menos 80% de linhas da assembly de producao.
 # CI/CD e observabilidade da Fase 4
 
 O PR executa testes/cobertura, SonarCloud com Quality Gate bloqueante e build
-Docker. Em `main`, `publish-deploy` publica
-`ghcr.io/venomouus/oficina-execution-service:<SHA>` e aguarda o rollout no
-Kubernetes. Configure `KUBE_CONFIG_B64` no GitHub e o Secret
-`messaging-secrets` e `execution-service-secrets` (chave
-`database-connection`) no namespace `oficina`. O manifesto nao inclui credenciais
-reais. A imagem GHCR deve ser publica ou ter permissao de pull no cluster.
+Docker. Em `main`, `publish-deploy` assume a role AWS via OIDC, publica
+`oficina-fase4-lab/execution-service:<SHA>` no ECR privado e aguarda o rollout
+no EKS. Os Secrets `messaging-secrets` e `execution-service-secrets` (chave
+`database-connection`) devem existir no namespace `oficina`; o manifesto nao
+inclui credenciais reais.
 
 Os logs JSON vao para stdout. Defina `OTEL_EXPORTER_OTLP_ENDPOINT` para enviar
 traces, metricas HTTP/Saga e logs por OTLP gRPC ao coletor da Fase 3. No
